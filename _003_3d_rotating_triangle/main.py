@@ -15,8 +15,8 @@ if __name__ == '__main__':
 	if platform.uname().system == 'Darwin':
 		f = QSurfaceFormat()
 		f.setVersion(4, 1)
-		f.setDepthBufferSize(1) # fix depth buffer error
-		f.setStencilBufferSize(1) # fix stencil buffer error
+		f.setDepthBufferSize(1)  # fix depth buffer error
+		f.setStencilBufferSize(1)  # fix stencil buffer error
 
 		# If CoreProfile is used, all the other QML rendering will fail, because they only use 2.1
 		f.setProfile(QSurfaceFormat.CompatibilityProfile)
@@ -27,7 +27,7 @@ if __name__ == '__main__':
 	app = QGuiApplication(sys.argv)
 
 	view = QQuickView()
-	view.setFormat(f)
+	# view.setFormat(f)
 	view.setPersistentSceneGraph(True)
 	view.setPersistentOpenGLContext(True)
 	view.setResizeMode(QQuickView.SizeRootObjectToView)  # Set for the object to resize correctly

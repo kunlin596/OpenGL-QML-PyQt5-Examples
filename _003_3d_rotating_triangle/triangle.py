@@ -6,6 +6,17 @@ from PyQt5.QtGui import QOpenGLShaderProgram, QOpenGLShader, QMatrix4x4, QOpenGL
 from _003_3d_rotating_triangle.utils import *
 from _003_3d_rotating_triangle.utils import Camera
 
+import platform as pf
+import sys
+
+if pf.uname().system == 'Linux':
+	try:
+		import OpenGL.GL as GL
+	except ImportError as e:
+		GL = None
+		print('can\'t import OpenGL')
+		sys.exit(1)
+
 positions = [
 	(-0.5, -0.8, 0.0),
 	(0.5, -0.8, 0.0),
@@ -37,21 +48,22 @@ colors_blue = [
 
 colors = colors_mixed
 
+
 class TriangleUnderlay(QQuickItem):
-	def __init__ (self, parent = None):
+	def __init__ ( self, parent = None ):
 		super(TriangleUnderlay, self).__init__(parent)
 		self._renderer = None
 		self.windowChanged.connect(self.onWindowChanged)
 
 	# @pyqtSlot('QQuickWindow'), incompatible connection error, don't know why
-	def onWindowChanged (self, window):
+	def onWindowChanged ( self, window ):
 		# Because it's in different thread which required a direct connection
 		# window == self.window(), they are pointing to the same window instance. Verified.
 		window.beforeSynchronizing.connect(self.sync, type = Qt.DirectConnection)
 		window.setClearBeforeRendering(False)  # otherwise quick would clear everything we render
 
 	@pyqtSlot(name = 'sync')
-	def sync (self):
+	def sync ( self ):
 		if self._renderer is None:
 			self._renderer = TriangleUnderlayRenderer()
 			self.window().beforeRendering.connect(self._renderer.paint, type = Qt.DirectConnection)
@@ -59,7 +71,7 @@ class TriangleUnderlay(QQuickItem):
 		self._renderer.set_window(self.window())
 
 	@pyqtSlot(int)
-	def changeColor (self, color_enum):
+	def changeColor ( self, color_enum ):
 		global colors
 		if color_enum == 1:
 			colors = colors_red
@@ -72,7 +84,7 @@ class TriangleUnderlay(QQuickItem):
 
 
 class TriangleUnderlayRenderer(QObject):
-	def __init__ (self, parent = None):
+	def __init__ ( self, parent = None ):
 		super(TriangleUnderlayRenderer, self).__init__(parent)
 		self._shader_program = None
 		self._viewport_size = QSize()
@@ -91,15 +103,17 @@ class TriangleUnderlayRenderer(QObject):
 		self._projection_matrix = self._perspective_projection_matrix
 
 	@pyqtSlot(int)
-	def setProjectionType (self, t):
+	def setProjectionType ( self, t ):
 		if t != self._projection_type:
 			self._projection_type = t
 
 	@pyqtSlot()
-	def paint (self):
+	def paint ( self ):
 
 		# for Darwin, it's a must
-		gl = self._window.openglContext().versionFunctions()
+		if pf.uname().system == 'Darwin':
+			global GL
+			GL = self._window.openglContext().versionFunctions()
 
 		if self._shader_program is None:
 			self._shader_program = QOpenGLShaderProgram()
@@ -131,11 +145,11 @@ class TriangleUnderlayRenderer(QObject):
 		self._shader_program.setUniformValue('projection_matrix',
 		                                     QMatrix4x4(self._projection_matrix.flatten().tolist()))
 
-		gl.glViewport(0, 0, self._viewport_size.width(), self._viewport_size.height())
-		gl.glClearColor(0.5, 0.5, 0.5, 1)
-		gl.glEnable(gl.GL_DEPTH_TEST)
-		gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-		gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3)
+		GL.glViewport(0, 0, self._viewport_size.width(), self._viewport_size.height())
+		GL.glClearColor(0.5, 0.5, 0.5, 1)
+		GL.glEnable(GL.GL_DEPTH_TEST)
+		GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+		GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)
 
 		self._shader_program.disableAttributeArray(0)
 		self._shader_program.disableAttributeArray(1)
@@ -146,8 +160,8 @@ class TriangleUnderlayRenderer(QObject):
 		self._window.resetOpenGLState()
 		self._window.update()
 
-	def set_viewport_size (self, size):
+	def set_viewport_size ( self, size ):
 		self._viewport_size = size
 
-	def set_window (self, window):
+	def set_window ( self, window ):
 		self._window = window
