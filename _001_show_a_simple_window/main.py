@@ -9,6 +9,8 @@ if __name__ == '__main__':
 
 	view = QQuickView()
 	view.setSource(QUrl('SimpleRect.qml'))
+	view.setResizeMode(QQuickView.SizeRootObjectToView)  # Set for the object to resize correctly
+
 	view.show()
 
 	app.exec()

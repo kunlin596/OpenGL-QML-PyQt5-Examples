@@ -4,8 +4,6 @@ from PyQt5.QtCore import Qt
 
 from PyQt5.QtGui import QOpenGLShaderProgram, QOpenGLShader
 
-from OpenGL.GL import *
-
 positions = [
 	(-0.5, -0.8, 0.0),
 	(0.5, -0.8, 0.0),
@@ -37,23 +35,6 @@ colors_blue = [
 
 colors = colors_mixed
 
-vertex_shader_source = "attribute highp vec3 position;\n" \
-                       "attribute highp vec3 color;\n" \
-                       "\n" \
-                       "varying vec3 pass_color;\n" \
-                       "\n" \
-                       "void main () {\n" \
-                       "    gl_Position = vec4(position, 1.0);\n" \
-                       "    pass_color = color;\n" \
-                       "}\n"
-
-fragment_shader_source = "varying highp vec3 pass_color;\n" \
-                         "\n" \
-                         "void main () {\n" \
-                         "    gl_FragColor = vec4(pass_color, 1.0);\n" \
-                         "}\n"
-
-
 class TriangleUnderlay(QQuickItem):
 	def __init__ ( self, parent = None ):
 		super(TriangleUnderlay, self).__init__(parent)
@@ -70,7 +51,10 @@ class TriangleUnderlay(QQuickItem):
 	@pyqtSlot(name = 'sync')
 	def sync ( self ):
 		if self._renderer is None:
-			self._renderer = TriangleUnderlayRenderer(self)
+			# QObject: Cannot create children for a parent that is in a different thread.
+			# (Parent is TriangleUnderlay(0x7fd0d64734e0), parent's thread is QThread(0x7fd0d6197270), current thread is QSGRenderThread(0x7fd0d70b9210)
+			# TriangleUnderlay should NOT be TriangleUnderlayRenderer's parent
+			self._renderer = TriangleUnderlayRenderer()
 			# Because it's in different thread which required a direct connection
 			self.window().beforeRendering.connect(self._renderer.paint, type = Qt.DirectConnection)
 		self._renderer.set_viewport_size(self.window().size() * self.window().devicePixelRatio())
@@ -98,12 +82,15 @@ class TriangleUnderlayRenderer(QObject):
 
 	@pyqtSlot()
 	def paint ( self ):
+
+		# TODO test on Ubuntu
+		# for Darwin, it's a must
+		gl = self._window.openglContext().versionFunctions()
+
 		if self._shader_program is None:
 			self._shader_program = QOpenGLShaderProgram()
-			self._shader_program.addShaderFromSourceCode(QOpenGLShader.Vertex,
-			                                             vertex_shader_source)
-			self._shader_program.addShaderFromSourceCode(QOpenGLShader.Fragment,
-			                                             fragment_shader_source)
+			self._shader_program.addShaderFromSourceFile(QOpenGLShader.Vertex, 'shaders/OpenGL_2_1/vertex.glsl')
+			self._shader_program.addShaderFromSourceFile(QOpenGLShader.Fragment, 'shaders/OpenGL_2_1/fragment.glsl')
 			self._shader_program.bindAttributeLocation('position', 0)
 			self._shader_program.bindAttributeLocation('color', 1)
 			self._shader_program.link()
@@ -115,14 +102,14 @@ class TriangleUnderlayRenderer(QObject):
 		self._shader_program.setAttributeArray(0, positions)
 		self._shader_program.setAttributeArray(1, colors)
 
-		glViewport(0, 0, self._viewport_size.width(), self._viewport_size.height())
-		#
-		glClearColor(0.5, 0.5, 0.5, 1)
-		# glDisable(GL_DEPTH_TEST)
+		gl.glViewport(0, 0, self._viewport_size.width(), self._viewport_size.height())
 
-		glClear(GL_COLOR_BUFFER_BIT)
+		gl.glClearColor(0.5, 0.5, 0.5, 1)
+		gl.glDisable(gl.GL_DEPTH_TEST)
 
-		glDrawArrays(GL_TRIANGLES, 0, 3)
+		gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+
+		gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3)
 
 		self._shader_program.disableAttributeArray(0)
 		self._shader_program.disableAttributeArray(1)
