@@ -10,6 +10,18 @@ Item {
         id: triangle
     }
 
+    Text {
+        text: '002 2D Triangle Example'
+        anchors {
+            left: parent.left
+            top: parent.top
+            margins: 20
+        }
+
+        font.pointSize: 10
+        color: 'white'
+    }
+
     Rectangle {
         id: button1
 

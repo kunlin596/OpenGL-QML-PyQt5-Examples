@@ -18,9 +18,9 @@ if pf.uname().system == 'Linux':
 		sys.exit(1)
 
 positions = [
-	(-0.5, -0.8, 0.0),
-	(0.5, -0.8, 0.0),
-	(0.0, 0.8, 0.0)
+	(-5.0, -5.0, 0.0),
+	(5.0, -5.0, 0.0),
+	(0.0, 5.0, 0.0)
 ]
 
 colors_mixed = [
@@ -50,10 +50,14 @@ colors = colors_mixed
 
 
 class TriangleUnderlay(QQuickItem):
+	theta_changed = pyqtSignal(name = 'theta_changed')  # the optional unbound notify signal. Probably no need herel
+
 	def __init__ ( self, parent = None ):
 		super(TriangleUnderlay, self).__init__(parent)
 		self._renderer = None
 		self.windowChanged.connect(self.onWindowChanged)
+
+		self._theta = 0.0
 
 	# @pyqtSlot('QQuickWindow'), incompatible connection error, don't know why
 	def onWindowChanged ( self, window ):
@@ -69,6 +73,7 @@ class TriangleUnderlay(QQuickItem):
 			self.window().beforeRendering.connect(self._renderer.paint, type = Qt.DirectConnection)
 		self._renderer.set_viewport_size(self.window().size() * self.window().devicePixelRatio())
 		self._renderer.set_window(self.window())
+		self._renderer.set_theta(self._theta)
 
 	@pyqtSlot(int)
 	def changeColor ( self, color_enum ):
@@ -82,6 +87,20 @@ class TriangleUnderlay(QQuickItem):
 		elif color_enum == 4:
 			colors = colors_mixed
 
+	@pyqtProperty('float', notify = theta_changed)
+	def theta ( self ):
+		return self._theta
+
+	@theta.setter
+	def theta ( self, theta ):
+		if theta == self._theta:
+			return
+		self._theta = theta
+		self.theta_changed.emit()
+
+		if self.window():
+			self.window().update()
+
 
 class TriangleUnderlayRenderer(QObject):
 	def __init__ ( self, parent = None ):
@@ -91,16 +110,30 @@ class TriangleUnderlayRenderer(QObject):
 		self._window = None
 		self._camera = Camera()
 
-		# TODO
-		self._perspective_projection_matrix = perspective_projection()
+		self._perspective_projection_matrix = perspective_projection(45.0, 4.0 / 3.0,
+		                                                             0.001, 100.0)
 
-		# TODO
-		self._orthographic_projection_matrix = orthographic_projection()
+		self._orthographic_projection_matrix = orthographic_projection(640.0, 480.0,
+		                                                               0.001, 100.0)
 
 		self._model_matrix = np.identity(4)
 
 		self._projection_type = 0
 		self._projection_matrix = self._perspective_projection_matrix
+
+		self._theta = 0.0
+
+	def set_theta ( self, theta ):
+		self._theta = theta
+
+	# around y axis
+	def build_rotation_matrix ( self ):
+		m = np.identity(4)
+		m[0][0] = np.cos(np.radians(self._theta))
+		m[0][2] = np.sin(np.radians(self._theta))
+		m[2][0] = -np.sin(np.radians(self._theta))
+		m[2][2] = np.cos(np.radians(self._theta))
+		return m
 
 	@pyqtSlot(int)
 	def setProjectionType ( self, t ):
@@ -109,7 +142,6 @@ class TriangleUnderlayRenderer(QObject):
 
 	@pyqtSlot()
 	def paint ( self ):
-
 		# for Darwin, it's a must
 		if pf.uname().system == 'Darwin':
 			global GL
@@ -135,18 +167,23 @@ class TriangleUnderlayRenderer(QObject):
 		elif self._projection_type == 1:
 			self._projection_matrix = self._orthographic_projection_matrix
 
-		self._shader_program.setUniformValue('model_matrix', QMatrix4x4(self._model_matrix.flatten().tolist()))
+		self._model_matrix = self.build_rotation_matrix()
 
-		# TODO
+		self._shader_program.setUniformValue('model_matrix',
+		                                     QMatrix4x4(self._model_matrix.flatten().tolist()))
+
 		self._shader_program.setUniformValue('view_matrix',
 		                                     QMatrix4x4(self._camera.get_view_matrix().flatten().tolist()))
 
-		# TODO
 		self._shader_program.setUniformValue('projection_matrix',
 		                                     QMatrix4x4(self._projection_matrix.flatten().tolist()))
 
+		# print(self._projection_matrix)
+		# print(self._camera.get_view_matrix())
+		# print(self._model_matrix)
+
 		GL.glViewport(0, 0, self._viewport_size.width(), self._viewport_size.height())
-		GL.glClearColor(0.5, 0.5, 0.5, 1)
+		GL.glClearColor(0.2, 0.2, 0.2, 1)
 		GL.glEnable(GL.GL_DEPTH_TEST)
 		GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 		GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)

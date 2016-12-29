@@ -8,6 +8,31 @@ Item {
 
     TriangleUnderlay {
         id: triangle
+        theta: 0.0
+    }
+
+    Timer {
+        interval: 20
+        running: true
+        repeat: true
+        onTriggered: {
+            triangle.theta = triangle.theta + 2.0
+            if (triangle.theta == 360.0) {
+                triangle.theta = 0.0
+            }
+        }
+    }
+
+    Text {
+        text: '003 3D Rotating Triangle Example'
+        anchors {
+            left: parent.left
+            top: parent.top
+            margins: 20
+        }
+
+        font.pointSize: 10
+        color: 'white'
     }
 
     Rectangle {
@@ -21,7 +46,7 @@ Item {
         anchors.right: parent.right
 
 
-        Behavior on width { NumberAnimation { duration: 100 } }
+        Behavior on width { NumberAnimation { duration: 50 } }
 
         Text {
             text: 'Red'
@@ -61,7 +86,7 @@ Item {
         anchors.right: parent.right
 
 
-        Behavior on width { NumberAnimation { duration: 100 } }
+        Behavior on width { NumberAnimation { duration: 50 } }
 
         Text {
             text: 'Green'
@@ -95,14 +120,12 @@ Item {
         width: 200
         height: 50
 
-
         color: Qt.rgba(0.1, 0.1, 1.0, 1.0)
 
         anchors.top: button2.bottom
         anchors.right: parent.right
 
-
-        Behavior on width { NumberAnimation { duration: 100 } }
+        Behavior on width { NumberAnimation { duration: 50 } }
 
         Text {
             text: 'Blue'
@@ -127,7 +150,6 @@ Item {
             onClicked: {
                 triangle.changeColor(3)
             }
-
         }
     }
 
@@ -140,8 +162,7 @@ Item {
         anchors.top: button3.bottom
         anchors.right: parent.right
 
-
-        Behavior on width { NumberAnimation { duration: 100 } }
+        Behavior on width { NumberAnimation { duration: 50 } }
 
         LinearGradient {
             anchors.fill: parent
@@ -179,5 +200,4 @@ Item {
             }
         }
     }
-
 }
