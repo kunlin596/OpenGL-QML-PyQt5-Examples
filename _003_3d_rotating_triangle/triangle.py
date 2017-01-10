@@ -74,6 +74,7 @@ class TriangleUnderlay(QQuickItem):
 		self._renderer.set_viewport_size(self.window().size() * self.window().devicePixelRatio())
 		self._renderer.set_window(self.window())
 		self._renderer.set_theta(self._theta)
+		self._renderer.set_projection_matrix()
 
 	@pyqtSlot(int)
 	def changeColor ( self, color_enum ):
@@ -147,6 +148,11 @@ class TriangleUnderlayRenderer(QObject):
 			global GL
 			GL = self._window.openglContext().versionFunctions()
 
+		w = self._viewport_size.width()
+		h = self._viewport_size.height()
+
+		GL.glViewport(0, 0, int(w), int(h))
+
 		if self._shader_program is None:
 			self._shader_program = QOpenGLShaderProgram()
 			self._shader_program.addShaderFromSourceFile(QOpenGLShader.Vertex, 'shaders/OpenGL_2_1/vertex.glsl')
@@ -178,11 +184,6 @@ class TriangleUnderlayRenderer(QObject):
 		self._shader_program.setUniformValue('projection_matrix',
 		                                     QMatrix4x4(self._projection_matrix.flatten().tolist()))
 
-		# print(self._projection_matrix)
-		# print(self._camera.get_view_matrix())
-		# print(self._model_matrix)
-
-		GL.glViewport(0, 0, self._viewport_size.width(), self._viewport_size.height())
 		GL.glClearColor(0.2, 0.2, 0.2, 1)
 		GL.glEnable(GL.GL_DEPTH_TEST)
 		GL.glClear(GL.GL_COLOR_BUFFER_BIT)
@@ -202,3 +203,13 @@ class TriangleUnderlayRenderer(QObject):
 
 	def set_window ( self, window ):
 		self._window = window
+
+	def set_projection_matrix ( self ):
+		# Need to be set every time we change the size of the window
+		self._perspective_projection_matrix = perspective_projection(45.0,
+		                                                             self._viewport_size.width() / self._viewport_size.height(),
+		                                                             0.001, 100.0)
+
+		self._orthographic_projection_matrix = orthographic_projection(self._viewport_size.width(),
+		                                                               self._viewport_size.height(),
+		                                                               0.001, 100.0)
