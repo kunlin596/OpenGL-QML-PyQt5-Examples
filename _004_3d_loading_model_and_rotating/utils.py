@@ -24,8 +24,6 @@ class Camera(object):
 		# m[2][3] = -60.0
 		# return m
 
-		print(self._m)
-
 		return self._m
 
 	def get_projection_matrix (self):
@@ -41,7 +39,7 @@ class Camera(object):
 		# self._m[:, 2] = np.array([self.z[0], self.z[1], self.z[2], 0.0])
 		# self._m[:, 3] = np.array([self._eye[0], self._eye[1], self._eye[2], 1.0])
 		self._m = look_at(self._eye, self._eye + self._target, self._up)
-		print(self._m)
+		# print(self._m)
 
 	@pyqtSlot(float)
 	def move_horizontally (self, dist):
@@ -117,3 +115,73 @@ def orthographic_projection (w, h, near_z, far_z):
 
 def normalize_vector (v):
 	return v / la.norm(v)
+
+
+def rotate_x (angle):
+	rad = np.radians(angle)
+	m = np.identity(4)
+	m[0][0] = 1.0
+	m[1][1] = np.cos(rad)
+	m[1][2] = -np.sin(rad)
+	m[2][1] = np.sin(rad)
+	m[2][2] = np.cos(rad)
+	return m
+
+
+def rotate_y (angle):
+	rad = np.radians(angle)
+	m = np.identity(4)
+	m[0][0] = np.cos(rad)
+	m[0][2] = np.sin(rad)
+	m[1][1] = 1.0
+	m[2][0] = -np.sin(rad)
+	m[2][2] = np.cos(rad)
+	return m
+
+
+def rotate_z (angle):
+	rad = np.radians(angle)
+	m = np.identity(4)
+	m[0][0] = np.cos(rad)
+	m[0][1] = -np.sin(rad)
+	m[1][0] = np.sin(rad)
+	m[1][1] = np.cos(rad)
+	m[2][2] = 1.0
+	return m
+
+
+def translate (trans):
+	m = np.identity(4)
+	m[0][3] = trans[0]
+	m[1][3] = trans[1]
+	m[2][3] = trans[2]
+	return m
+
+
+def scale (scale_vec):
+	m = np.identity(4)
+	m[0][0] = scale_vec[0]
+	m[1][1] = scale_vec[1]
+	m[2][2] = scale_vec[2]
+	return m
+
+
+def create_transformation_matrix (translation,
+                                  rotation,
+                                  scale_val):
+	m = np.identity(4)
+	m2 = rotate_x(rotation[0])
+	m3 = rotate_y(rotation[1])
+	m4 = rotate_z(rotation[2])
+	m5 = scale(scale_val)
+
+	m = m5 * m4 * m3 * m2 * m
+
+	m[0][3] = translation[0]
+	m[1][3] = translation[1]
+	m[2][3] = translation[2]
+	# m[0][3] = 0
+	# m[1][3] = 0
+	# m[2][3] = 30
+
+	return m

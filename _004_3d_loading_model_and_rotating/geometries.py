@@ -1,9 +1,10 @@
 import numpy as np
 import pyassimp as ai
+import random
 
 
 class BaseGeometry(object):
-	def __init__ (self):
+	def __init__ (self, color = None):
 		self.id = -1
 		self.vertices = None
 		self.colors = None
@@ -13,6 +14,7 @@ class BaseGeometry(object):
 
 		self._scene = None
 		self._mesh = None
+		self.color = color
 
 	def read (self, path):
 		try:
@@ -21,6 +23,15 @@ class BaseGeometry(object):
 			self.vertices = self._mesh.vertices
 			self.indices = self._mesh.faces.flatten()
 			self.colors = self._mesh.colors
+
+			if self.color is not None:
+				self.colors = np.array([[self.color, self.color, self.color] for x in range(len(self.vertices))])
+			else:
+				r = random.uniform(0.3, 1.0)
+				g = random.uniform(0.3, 1.0)
+				b = random.uniform(0.3, 1.0)
+				self.colors = np.array([[r, g, b] for x in range(len(self.vertices))])
+
 
 		except Exception as e:
 			print('Geometry reading error', e)
@@ -49,8 +60,8 @@ class BaseGeometry(object):
 class Cube(BaseGeometry):
 	file_path = 'cube.obj'
 
-	def __init__ (self):
-		super(Cube, self).__init__()
+	def __init__ (self, color = None):
+		super(Cube, self).__init__(color)
 		self.length = 1.0
 		self.width = 1.0
 		self.height = 1.0
@@ -78,8 +89,8 @@ class Cube(BaseGeometry):
 class Sphere(BaseGeometry):
 	file_path = 'bunny.obj'
 
-	def __init__ (self):
-		super(Sphere, self).__init__()
+	def __init__ (self, val = None):
+		super(Sphere, self).__init__(val)
 		self.radius = 1.0
 		self.stretch_rate = 1.0
 

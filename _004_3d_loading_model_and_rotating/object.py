@@ -4,7 +4,6 @@ from PyQt5.QtCore import Qt
 
 from PyQt5.QtGui import QOpenGLShaderProgram, QOpenGLShader, QMatrix4x4, QOpenGLContext
 from _004_3d_loading_model_and_rotating.utils import *
-from _004_3d_loading_model_and_rotating.utils import Camera
 from _004_3d_loading_model_and_rotating.geometries import Cube, Sphere, Axis
 
 import random
@@ -24,8 +23,11 @@ if pf.uname().system == 'Linux':
 
 
 class Entity(object):
-	def __init__ (self):
-		pass
+	def __init__ (self, model, position, rotation, scale_val):
+		self._model = model
+		self.position = position
+		self.rotation = rotation
+		self.scale = scale_val
 
 
 class ModelUnderlay(QQuickItem):
@@ -110,12 +112,21 @@ class ModelUnderlay(QQuickItem):
 		elif key == 1:
 			self._renderer.move_model(-10)
 
+	@pyqtSlot()
+	def change_random_cube_color (self):
+		self._renderer.change_random_cube_color()
+
+	@pyqtSlot()
+	def change_random_sphere_color (self):
+		self._renderer.change_random_sphere_color()
+
 
 class ModelUnderlayRenderer(QObject):
 	def __init__ (self, parent = None):
 		super(ModelUnderlayRenderer, self).__init__(parent)
 
-		self._shader_program = None
+		self._cube_shader = None
+		self._sphere_shader = None
 		self._viewport_size = QSize()
 		self._window = None
 		self._camera = Camera()
@@ -126,7 +137,9 @@ class ModelUnderlayRenderer(QObject):
 		self._model_matrix = np.identity(4)
 
 		self._projection_type = 0
-		self._projection_matrix = self._perspective_projection_matrix
+		self._projection_matrix = perspective_projection(45.0,
+		                                                 640.0 / 480.0,
+		                                                 0.001, 1000.0)
 
 		self._index_buffer = -1
 
@@ -134,7 +147,7 @@ class ModelUnderlayRenderer(QObject):
 		self._cube_model = Cube()
 		self._sphere_model = Sphere()
 
-		self._models = {}
+		self._models = dict()
 		self._models[self._cube_model] = []
 		self._models[self._sphere_model] = []
 
@@ -153,68 +166,97 @@ class ModelUnderlayRenderer(QObject):
 		GL.glEnable(GL.GL_DEPTH_TEST)
 		GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 		GL.glClear(GL.GL_DEPTH_BUFFER_BIT)
-
-		if self._shader_program is None:
-			self._shader_program = QOpenGLShaderProgram()
-			self._shader_program.addShaderFromSourceFile(QOpenGLShader.Vertex, 'shaders/OpenGL_2_1/vertex.glsl')
-			self._shader_program.addShaderFromSourceFile(QOpenGLShader.Fragment, 'shaders/OpenGL_2_1/fragment.glsl')
-			self._shader_program.bindAttributeLocation('position', 0)
-			self._shader_program.bindAttributeLocation('color', 1)
-			self._shader_program.link()
-
-		vertices_block = np.array(self._cube_model.vertices)
-		colors_block = np.array(self._cube_model.colors)
-
-		if len(self._objects) > 1:
-			for v in self._vertices[1:]:
-				vertices_block = np.vstack((vertices_block, v))
-			for idx, c in enumerate(self._colors[1:]):
-				if not c:
-					c = [[0.6, 0.6, 0.7] for i in range(len(self._vertices[idx]))]
-				colors_block = np.vstack((colors_block, c))
-			for i in self._indices[1:]:
-				indices_block = np.hstack((indices_block, i))
-
-		self._shader_program.bind()
-		self._shader_program.enableAttributeArray(0)
-		self._shader_program.setAttributeArray(0, vertices_block)
-
-		self._shader_program.enableAttributeArray(1)
-		self._shader_program.setAttributeArray(1, colors_block)
-
-		self._projection_matrix = self._perspective_projection_matrix
-
-		def build_rotation_matrix (t):
-			m = np.identity(4)
-			m[0][0] = np.cos(np.radians(t))
-			m[0][2] = np.sin(np.radians(t))
-			m[2][0] = -np.sin(np.radians(t))
-			m[2][2] = np.cos(np.radians(t))
-			return m
-
-		global theta
-		theta += 1
-		self._model_matrix = build_rotation_matrix(theta)
-		self._model_matrix[2][3] = -3
-
+		#
+		# vertices_block = np.vstack((self._cube_model.vertices, self._sphere_model.vertices))
+		# colors_block = np.vstack((self._cube_model.colors, self._sphere_model))
+		#
+		# if len(self._objects) > 1:
+		# 	for v in self._vertices[1:]:
+		# 		vertices_block = np.vstack((vertices_block, v))
+		# 	for idx, c in enumerate(self._colors[1:]):
+		# 		if not c:
+		# 			c = [[0.6, 0.6, 0.7] for i in range(len(self._vertices[idx]))]
+		# 		colors_block = np.vstack((colors_block, c))
+		# 	for i in self._indices[1:]:
+		# 		indices_block = np.hstack((indices_block, i))
 		view_matrix = np.identity(4)
-		# view_matrix = self._camera.get_view_matrix()
 		view_matrix[2][3] = -30
 
-		self._shader_program.setUniformValue('model_matrix',
-		                                     QMatrix4x4(self._model_matrix.flatten().tolist()))
-		self._shader_program.setUniformValue('view_matrix',
-		                                     QMatrix4x4(view_matrix.flatten().tolist()).transposed())
-		self._shader_program.setUniformValue('projection_matrix',
-		                                     QMatrix4x4(self._projection_matrix.flatten().tolist()).transposed())
+		if self._cube_shader is None:
+			self._cube_shader = QOpenGLShaderProgram()
+			self._cube_shader.addShaderFromSourceFile(QOpenGLShader.Vertex, 'shaders/OpenGL_2_1/vertex.glsl')
+			self._cube_shader.addShaderFromSourceFile(QOpenGLShader.Fragment, 'shaders/OpenGL_2_1/fragment.glsl')
+			self._cube_shader.bindAttributeLocation('position', 0)
+			self._cube_shader.bindAttributeLocation('color', 1)
+			self._cube_shader.link()
 
-		GL.glDrawElements(GL.GL_TRIANGLES, len(indices_block), GL.GL_UNSIGNED_INT, indices_block.tolist())
-		# GL.glDrawArrays(GL.GL_TRIANGLES, 0, len(indices_block))
+		self._cube_shader.bind()
+		self._cube_shader.enableAttributeArray(0)
+		self._cube_shader.enableAttributeArray(1)
+		self._cube_shader.setAttributeArray(0, self._cube_model.vertices.tolist())
+		self._cube_shader.setAttributeArray(1, self._cube_model.colors.tolist())
+		# view_matrix = self._camera.get_view_matrix()
+		self._cube_shader.setUniformValue('view_matrix',
+		                                  QMatrix4x4(view_matrix.flatten().tolist()).transposed())
+		self._cube_shader.setUniformValue('projection_matrix',
+		                                  QMatrix4x4(self._projection_matrix.flatten().tolist()).transposed())
 
-		self._shader_program.disableAttributeArray(0)
-		self._shader_program.disableAttributeArray(1)
+		if self._cube_model in self._models.keys():
+			for entity in self._models[self._cube_model]:
+				m = create_transformation_matrix(entity.position, entity.rotation, entity.scale)
+				self._cube_shader.setUniformValue('model_matrix', QMatrix4x4(m.flatten().tolist()))
+				GL.glDrawElements(GL.GL_TRIANGLES,
+				                  len(self._cube_model.indices),
+				                  GL.GL_UNSIGNED_INT,
+				                  self._cube_model.indices.tolist())
 
-		self._shader_program.release()
+		self._cube_shader.disableAttributeArray(0)
+		self._cube_shader.disableAttributeArray(1)
+		self._cube_shader.release()
+
+		if self._sphere_shader is None:
+			self._sphere_shader = QOpenGLShaderProgram()
+			self._sphere_shader.addShaderFromSourceFile(QOpenGLShader.Vertex, 'shaders/OpenGL_2_1/vertex.glsl')
+			self._sphere_shader.addShaderFromSourceFile(QOpenGLShader.Fragment, 'shaders/OpenGL_2_1/fragment.glsl')
+			self._sphere_shader.bindAttributeLocation('position', 0)
+			self._sphere_shader.bindAttributeLocation('color', 1)
+			self._sphere_shader.link()
+
+		self._sphere_shader.bind()
+		self._sphere_shader.enableAttributeArray(0)
+		self._sphere_shader.enableAttributeArray(1)
+		self._sphere_shader.setAttributeArray(0, self._sphere_model.vertices.tolist())
+		self._sphere_shader.setAttributeArray(1, self._sphere_model.colors.tolist())
+		self._sphere_shader.setUniformValue('view_matrix',
+		                                    QMatrix4x4(view_matrix.flatten().tolist()).transposed())
+		self._sphere_shader.setUniformValue('projection_matrix',
+		                                    QMatrix4x4(self._projection_matrix.flatten().tolist()).transposed())
+
+		if self._sphere_model in self._models.keys():
+			for entity in self._models[self._sphere_model]:
+				m = create_transformation_matrix(entity.position, entity.rotation, entity.scale)
+				self._cube_shader.setUniformValue('model_matrix', QMatrix4x4(m.flatten().tolist()))
+				GL.glDrawElements(GL.GL_TRIANGLES,
+				                  len(self._sphere_model.indices),
+				                  GL.GL_UNSIGNED_INT,
+				                  self._sphere_model.indices.tolist())
+		self._sphere_shader.disableAttributeArray(0)
+		self._sphere_shader.disableAttributeArray(1)
+		self._sphere_shader.release()
+
+		# def build_rotation_matrix (t):
+		# 	m = np.identity(4)
+		# 	m[0][0] = np.cos(np.radians(t))
+		# 	m[0][2] = np.sin(np.radians(t))
+		# 	m[2][0] = -np.sin(np.radians(t))
+		# 	m[2][2] = np.cos(np.radians(t))
+		# 	return m
+		#
+		# global theta
+		# theta += 1
+		# self._model_matrix = build_rotation_matrix(theta)
+		# self._model_matrix[2][3] = -3
+
 
 		# Restore the OpenGL state for QtQuick rendering
 		self._window.resetOpenGLState()
@@ -228,9 +270,9 @@ class ModelUnderlayRenderer(QObject):
 
 	def set_projection_matrix (self):
 		# Need to be set every time we change the size of the window
-		self._perspective_projection_matrix = perspective_projection(45.0,
-		                                                             self._window.width() / self._window.height(),
-		                                                             0.001, 1000.0)
+		self._projection_matrix = perspective_projection(45.0,
+		                                                 self._window.width() / self._window.height(),
+		                                                 0.001, 1000.0)
 
 	def move_model (self, val):
 		self._model_matrix[2][3] += val
@@ -239,26 +281,43 @@ class ModelUnderlayRenderer(QObject):
 		pass
 
 	def add_geometry (self, geo_enum):
-		obj = None
 		if geo_enum == 0:
-			obj = Cube()
+			self._models[self._cube_model].append(Entity(self._cube_model,
+			                                             np.array([random.uniform(-3.0, 3.0),
+			                                                       random.uniform(-3.0, 3.0),
+			                                                       random.uniform(-20.0, -10.0)]),
+			                                             np.array([random.uniform(-45.0, 45.0),
+			                                                       random.uniform(-45.0, 45.0),
+			                                                       random.uniform(-45.0, 45.0)]),
+			                                             np.array([1.0, 1.0, 1.0])))
 		elif geo_enum == 1:
-			obj = Sphere()
-		elif geo_enum == 2:
-			obj = Axis()
+			self._models[self._sphere_model].append(Entity(self._sphere_model,
+			                                               np.array([random.uniform(-3.0, 3.0),
+			                                                         random.uniform(-3.0, 3.0),
+			                                                         random.uniform(-20.0, -10.0)]),
+			                                               np.array([random.uniform(-30.0, 30.0),
+			                                                         random.uniform(-30.0, 30.0),
+			                                                         random.uniform(-30.0, 30.0)]),
+			                                               np.array([1.0, 1.0, 1.0])))
 		else:
 			return
 
-		self._objects.append(obj)
-		self._vertices.append(obj.vertices)
-		self._colors.append(obj.colors)
-		self._indices.append(obj.indices)
+	def delete_geometry (self, geo_enum):
+		if geo_enum == 0:
+			if self._models[self._cube_model]:
+				self._models[self._cube_model].pop()
+		elif geo_enum == 1:
+			if self._models[self._sphere_model]:
+				self._models[self._sphere_model].pop()
 
-		obj.id = len(self._objects) - 1
+	def change_random_cube_color (self):
+		tmp = self._models[self._cube_model]
+		self._models.pop(self._cube_model)
+		self._cube_model = Cube()
+		self._models[self._cube_model] = tmp
 
-	def delete_geometry (self, i = 0):
-		if self._objects:
-			self._vertices.pop(i)
-			self._colors.pop(i)
-			self._indices.pop(i)
-			self._objects.pop(i)
+	def change_random_sphere_color (self):
+		tmp = self._models[self._sphere_model]
+		self._models.pop(self._sphere_model)
+		self._sphere_model = Sphere()
+		self._models[self._sphere_model] = tmp

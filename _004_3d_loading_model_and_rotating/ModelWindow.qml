@@ -121,7 +121,7 @@ Item {
         anchors.right: parent.right
 
         mouse_area.onClicked: {
-            scene.delete_geometry(0)
+            scene.delete_geometry(1)
         }
     }
 
@@ -146,4 +146,23 @@ Item {
         anchors.left: parent.left
     }
 
+    Button {
+        id: change_random_cube_color
+        text:'Random Cube Color'
+        anchors.top: stretch_z_button.bottom
+        anchors.left: parent.left
+        mouse_area.onClicked: {
+            scene.change_random_cube_color()
+        }
+    }
+
+    Button {
+        id: change_random_sphere_color
+        text:'Random Cube Color'
+        anchors.top: change_random_cube_color.bottom
+        anchors.left: parent.left
+        mouse_area.onClicked: {
+            scene.change_random_sphere_color()
+        }
+    }
 }
