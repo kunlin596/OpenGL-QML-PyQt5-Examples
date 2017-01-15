@@ -3,7 +3,7 @@ import QtQuick 2.0
 import QtGraphicalEffects 1.0
 
 Rectangle {
-    width: 130
+    width: 100
     height: 50
 
     property alias text: text.text
@@ -28,12 +28,12 @@ Rectangle {
         hoverEnabled: true
 
         onEntered: {
-            parent.width = 150;
+            parent.width = 120;
             parent.color = Qt.rgba(0.0, 0.2, 0.8, 1.0)
         }
 
         onExited: {
-            parent.width = 130;
+            parent.width = 100;
             parent.color = Qt.rgba(0.2, 0.2, 0.2, 1.0)
         }
 
