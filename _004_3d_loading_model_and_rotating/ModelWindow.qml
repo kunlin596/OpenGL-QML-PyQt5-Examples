@@ -4,30 +4,76 @@ import QtGraphicalEffects 1.0
 
 Item {
     width: 640
-    height: 320
+    height: 480
 
-    ModelUnderlay {
-        id: triangle
-        theta: 0.0
-    }
+    focus: true
+    Keys.onPressed: {
+        if (event.key == Qt.Key_W) {
+//            scene.move_camera(0);
+            event.accepted = true;
+            console.log("(w) Move camera forward")
+        }
+        if (event.key == Qt.Key_S) {
+//            scene.move_camera(1);
+            event.accepted = true;
+            console.log("(s) Move camera backward")
+        }
 
-    Timer {
-        interval: 20
-        running: true
-        repeat: true
-        onTriggered: {
-            triangle.theta = triangle.theta + 2.0
-            if (triangle.theta == 360.0) {
-                triangle.theta = 0.0
-            }
+        if (event.key == Qt.Key_A) {
+//            scene.move_camera(1);
+            event.accepted = true;
+            console.log("(a) Move camera left")
+        }
+
+        if (event.key == Qt.Key_D) {
+//            scene.move_camera(1);
+            event.accepted = true;
+            console.log("(d) Move camera right")
+        }
+
+        if (event.key == Qt.Key_Space) {
+//            scene.move_camera(1);
+            event.accepted = true;
+            console.log("(Space) Move camera ascend")
         }
     }
 
+    ModelUnderlay {
+        id: scene
+    }
+
+//    Rectangle {
+//        id: rectangle
+//        x: 40
+//        y: 20
+//        width: 120
+//        height: 120
+//        color: "red"
+//
+//        focus: true
+//        Keys.onUpPressed: rectangle.y -= 10
+//        Keys.onDownPressed: rectangle.y += 10
+//        Keys.onLeftPressed: rectangle.x += 10
+//        Keys.onRightPressed: rectangle.x -= 10
+//    }
+
+//    Timer {
+//        interval: 20
+//        running: true
+//        repeat: true
+//        onTriggered: {
+//            triangle.theta = triangle.theta + 2.0
+//            if (triangle.theta == 360.0) {
+//                triangle.theta = 0.0
+//            }
+//        }
+//    }
+
     Text {
-        text: '003 3D Rotating Triangle Example'
+        text: 'Simple 3D Editor By Kun'
         anchors {
             left: parent.left
-            top: parent.top
+            bottom: parent.bottom
             margins: 20
         }
 
@@ -35,169 +81,69 @@ Item {
         color: 'white'
     }
 
-    Rectangle {
-        id: button1
-
-        width: 200
-        height: 50
-
-        color: Qt.rgba(0.9, 0.1, 0.1, 1.0)
-
+    Button {
+        id: add_cube_button
+        text: 'Add Cube'
+        anchors.top: parent.top
         anchors.right: parent.right
 
-
-        Behavior on width { NumberAnimation { duration: 50 } }
-
-        Text {
-            text: 'Red'
-            anchors.centerIn: parent
-            font.pointSize: 20
-            color: 'white'
-        }
-
-        MouseArea
-        {
-            anchors.fill: parent
-            hoverEnabled: true
-
-            onEntered: {
-                button1.width = 210
-            }
-
-            onExited: {
-                button1.width = 190
-            }
-
-            onClicked: {
-                triangle.changeColor(1)
-            }
+        mouse_area.onClicked: {
+            scene.add_geometry(0)
         }
     }
 
-    Rectangle {
-        id: button2
-
-        width: 200
-        height: 50
-
-        color: Qt.rgba(0.1, 1.0, 0.1, 1.0)
-
-        anchors.top: button1.bottom
+    Button {
+        id: delete_cube_button
+        text: 'Delete Cube'
+        anchors.top: add_cube_button.bottom
         anchors.right: parent.right
 
-
-        Behavior on width { NumberAnimation { duration: 50 } }
-
-        Text {
-            text: 'Green'
-            anchors.centerIn: parent
-            font.pointSize: 20
-            color: 'white'
-        }
-
-        MouseArea
-        {
-            anchors.fill: parent
-            hoverEnabled: true
-
-            onEntered: {
-                button2.width = 210
-            }
-
-            onExited: {
-                button2.width = 190
-            }
-
-            onClicked: {
-                triangle.changeColor(2)
-            }
+        mouse_area.onClicked: {
+            scene.delete_geometry(0)
         }
     }
 
-    Rectangle {
-        id: button3
-
-        width: 200
-        height: 50
-
-        color: Qt.rgba(0.1, 0.1, 1.0, 1.0)
-
-        anchors.top: button2.bottom
+    Button {
+        id: add_sphere_button
+        text: 'Add Sphere'
+        anchors.top: delete_cube_button.bottom
         anchors.right: parent.right
 
-        Behavior on width { NumberAnimation { duration: 50 } }
-
-        Text {
-            text: 'Blue'
-            anchors.centerIn: parent
-            font.pointSize: 20
-            color: 'white'
-        }
-
-        MouseArea
-        {
-            anchors.fill: parent
-            hoverEnabled: true
-
-            onEntered: {
-                button3.width = 210
-            }
-
-            onExited: {
-                button3.width = 190
-            }
-
-            onClicked: {
-                triangle.changeColor(3)
-            }
+        mouse_area.onClicked: {
+            scene.add_geometry(1)
         }
     }
 
-    Rectangle {
-        id: button4
-
-        width: 200
-        height: 50
-
-        anchors.top: button3.bottom
+    Button {
+        id: delete_sphere_button
+        text: 'Delete Sphere'
+        anchors.top: add_sphere_button.bottom
         anchors.right: parent.right
 
-        Behavior on width { NumberAnimation { duration: 50 } }
-
-        LinearGradient {
-            anchors.fill: parent
-            start: Qt.point(0, 0)
-            end: Qt.point(button4.width, 0)
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "red" }
-                GradientStop { position: 0.5; color: "green" }
-                GradientStop { position: 1.0; color: "blue" }
-            }
-        }
-
-        Text {
-            text: '3 Colors'
-            anchors.centerIn: parent
-            font.pointSize: 20
-            color: 'white'
-        }
-
-        MouseArea
-        {
-            anchors.fill: parent
-            hoverEnabled: true
-
-            onEntered: {
-                button4.width = 210
-            }
-
-            onExited: {
-                button4.width = 190
-            }
-
-            onClicked: {
-                triangle.changeColor(4)
-            }
+        mouse_area.onClicked: {
+            scene.delete_geometry(0)
         }
     }
+
+    Button {
+        id: stretch_x_button
+        text: 'Stretch X'
+        anchors.top: parent.top
+        anchors.left: parent.left
+    }
+
+    Button {
+        id: stretch_y_button
+        text: 'Stretch Y'
+        anchors.top: stretch_x_button.bottom
+        anchors.left: parent.left
+    }
+
+    Button {
+        id: stretch_z_button
+        text: 'Stretch Z'
+        anchors.top: stretch_y_button.bottom
+        anchors.left: parent.left
+    }
+
 }

@@ -7,7 +7,6 @@ uniform highp mat4 projection_matrix;
 varying vec3 pass_color;
 
 void main () {
-    mat4 m = projection_matrix * view_matrix * model_matrix;
-    gl_Position = m * vec4(position, 1.0);
+    gl_Position = projection_matrix * view_matrix * model_matrix * vec4(position, 1.0);
     pass_color = color;
 }

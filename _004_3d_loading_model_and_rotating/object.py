@@ -3,13 +3,16 @@ from PyQt5.QtQuick import QQuickItem
 from PyQt5.QtCore import Qt
 
 from PyQt5.QtGui import QOpenGLShaderProgram, QOpenGLShader, QMatrix4x4, QOpenGLContext
-from _003_3d_rotating_triangle.utils import *
-from _003_3d_rotating_triangle.utils import Camera
+from _004_3d_loading_model_and_rotating.utils import *
+from _004_3d_loading_model_and_rotating.utils import Camera
+from _004_3d_loading_model_and_rotating.geometries import Cube, Sphere, Axis
 
-import platform as pf
+import random
 import sys
+import numpy as np
+import platform as pf
 
-import pyassimp as ai
+theta = 0.0
 
 if pf.uname().system == 'Linux':
 	try:
@@ -20,10 +23,15 @@ if pf.uname().system == 'Linux':
 		sys.exit(1)
 
 
+class Entity(object):
+	def __init__ (self):
+		pass
+
+
 class ModelUnderlay(QQuickItem):
 	theta_changed = pyqtSignal(name = 'theta_changed')  # the optional unbound notify signal. Probably no need herel
 
-	def __init__ ( self, parent = None ):
+	def __init__ (self, parent = None):
 		super(ModelUnderlay, self).__init__(parent)
 		self._renderer = None
 		self.windowChanged.connect(self.onWindowChanged)
@@ -31,24 +39,23 @@ class ModelUnderlay(QQuickItem):
 		self._theta = 0.0
 
 	# @pyqtSlot('QQuickWindow'), incompatible connection error, don't know why
-	def onWindowChanged ( self, window ):
+	def onWindowChanged (self, window):
 		# Because it's in different thread which required a direct connection
 		# window == self.window(), they are pointing to the same window instance. Verified.
 		window.beforeSynchronizing.connect(self.sync, type = Qt.DirectConnection)
 		window.setClearBeforeRendering(False)  # otherwise quick would clear everything we render
 
 	@pyqtSlot(name = 'sync')
-	def sync ( self ):
+	def sync (self):
 		if self._renderer is None:
 			self._renderer = ModelUnderlayRenderer()
 			self.window().beforeRendering.connect(self._renderer.paint, type = Qt.DirectConnection)
 		self._renderer.set_viewport_size(self.window().size() * self.window().devicePixelRatio())
 		self._renderer.set_window(self.window())
-		self._renderer.set_theta(self._theta)
 		self._renderer.set_projection_matrix()
 
 	@pyqtSlot(int)
-	def changeColor ( self, color_enum ):
+	def changeColor (self, color_enum):
 		# if color_enum == 1:
 		# 	colors = colors_red
 		# elif color_enum == 2:
@@ -59,72 +66,80 @@ class ModelUnderlay(QQuickItem):
 		# 	colors = colors_mixed
 		pass
 
-	@pyqtProperty('float', notify = theta_changed)
-	def theta ( self ):
-		return self._theta
+	@pyqtSlot(int)
+	def add_geometry (self, geo_enum):
+		self._renderer.add_geometry(geo_enum)
 
-	@theta.setter
-	def theta ( self, theta ):
-		if theta == self._theta:
-			return
-		self._theta = theta
-		self.theta_changed.emit()
+	@pyqtSlot(int)
+	def delete_geometry (self, index):
+		self._renderer.delete_geometry(index)
 
-		if self.window():
-			self.window().update()
+	@pyqtSlot(int)
+	def select_obj (self, index = 0):
+		pass
+
+	@pyqtSlot(float)
+	def stretch_x (self, x):
+		pass
+
+	@pyqtSlot(float)
+	def stretch_y (self, y):
+		pass
+
+	@pyqtSlot(float)
+	def stretch_z (self, z):
+		pass
+
+	@pyqtSlot(int, int)
+	def rotate_obj (self, x, y):
+		pass
+
+	@pyqtSlot(int, int)
+	def rotate_camera (self, x, y):
+		pass
+
+	@pyqtSlot(int)
+	def move_camera (self, key):
+		"""
+		Use keyboard to control camera
+		:param key:
+		:return:
+		"""
+		if key == 0:
+			self._renderer.move_model(10)
+		elif key == 1:
+			self._renderer.move_model(-10)
 
 
 class ModelUnderlayRenderer(QObject):
-	def __init__ ( self, parent = None ):
+	def __init__ (self, parent = None):
 		super(ModelUnderlayRenderer, self).__init__(parent)
+
 		self._shader_program = None
 		self._viewport_size = QSize()
 		self._window = None
 		self._camera = Camera()
 
-		self._scene = ai.load('bunny.obj')
-		self._mesh = self._scene.meshes[0]
-		assert (len(self._mesh))
-		self._vertices = self._mesh.vertices[0]
-		assert (len(self._vertices))
-		self._colors = self._mesh.colors[0]
-		assert (len(self._colors))
-
-		self._perspective_projection_matrix = perspective_projection(45.0, 4.0 / 3.0,
-		                                                             0.001, 100.0)
-
-		self._orthographic_projection_matrix = orthographic_projection(640.0, 480.0,
-		                                                               0.001, 100.0)
+		self._perspective_projection_matrix = None
+		self._orthographic_projection_matrix = None
 
 		self._model_matrix = np.identity(4)
 
 		self._projection_type = 0
 		self._projection_matrix = self._perspective_projection_matrix
 
-		self._theta = 0.0
+		self._index_buffer = -1
 
-	def __del__ ( self ):
-		ai.release(self._scene)
+		# keep track of the objects in the scene
+		self._cube_model = Cube()
+		self._sphere_model = Sphere()
 
-	def set_theta ( self, theta ):
-		self._theta = theta
-
-	# around y axis
-	def build_rotation_matrix ( self ):
-		m = np.identity(4)
-		m[0][0] = np.cos(np.radians(self._theta))
-		m[0][2] = np.sin(np.radians(self._theta))
-		m[2][0] = -np.sin(np.radians(self._theta))
-		m[2][2] = np.cos(np.radians(self._theta))
-		return m
-
-	@pyqtSlot(int)
-	def setProjectionType ( self, t ):
-		if t != self._projection_type:
-			self._projection_type = t
+		self._models = {}
+		self._models[self._cube_model] = []
+		self._models[self._sphere_model] = []
 
 	@pyqtSlot()
-	def paint ( self ):
+	def paint (self):
 		# for Darwin, it's a must
 		if pf.uname().system == 'Darwin':
 			global GL
@@ -133,16 +148,11 @@ class ModelUnderlayRenderer(QObject):
 		w = self._viewport_size.width()
 		h = self._viewport_size.height()
 
-		# x, y
-		#     Specify the lower left corner of the viewport rectangle,
-		#     in pixels. The initial value is (0,0).
-		# width, height
-		#     Specify the width and height
-		#     of the viewport.
-		#     When a GL context is first attached to a window,
-		#     width and height are set to the dimensions of that
-		#     window.
 		GL.glViewport(0, 0, int(w), int(h))
+		GL.glClearColor(0.1, 0.1, 0.1, 1)
+		GL.glEnable(GL.GL_DEPTH_TEST)
+		GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+		GL.glClear(GL.GL_DEPTH_BUFFER_BIT)
 
 		if self._shader_program is None:
 			self._shader_program = QOpenGLShaderProgram()
@@ -152,33 +162,54 @@ class ModelUnderlayRenderer(QObject):
 			self._shader_program.bindAttributeLocation('color', 1)
 			self._shader_program.link()
 
+		vertices_block = np.array(self._cube_model.vertices)
+		colors_block = np.array(self._cube_model.colors)
+
+		if len(self._objects) > 1:
+			for v in self._vertices[1:]:
+				vertices_block = np.vstack((vertices_block, v))
+			for idx, c in enumerate(self._colors[1:]):
+				if not c:
+					c = [[0.6, 0.6, 0.7] for i in range(len(self._vertices[idx]))]
+				colors_block = np.vstack((colors_block, c))
+			for i in self._indices[1:]:
+				indices_block = np.hstack((indices_block, i))
+
 		self._shader_program.bind()
 		self._shader_program.enableAttributeArray(0)
+		self._shader_program.setAttributeArray(0, vertices_block)
+
 		self._shader_program.enableAttributeArray(1)
+		self._shader_program.setAttributeArray(1, colors_block)
 
-		self._shader_program.setAttributeArray(0, self._vertices)
-		self._shader_program.setAttributeArray(1, self._colors)
+		self._projection_matrix = self._perspective_projection_matrix
 
-		if self._projection_type == 0:
-			self._projection_matrix = self._perspective_projection_matrix
-		elif self._projection_type == 1:
-			self._projection_matrix = self._orthographic_projection_matrix
+		def build_rotation_matrix (t):
+			m = np.identity(4)
+			m[0][0] = np.cos(np.radians(t))
+			m[0][2] = np.sin(np.radians(t))
+			m[2][0] = -np.sin(np.radians(t))
+			m[2][2] = np.cos(np.radians(t))
+			return m
 
-		self._model_matrix = self.build_rotation_matrix()
+		global theta
+		theta += 1
+		self._model_matrix = build_rotation_matrix(theta)
+		self._model_matrix[2][3] = -3
+
+		view_matrix = np.identity(4)
+		# view_matrix = self._camera.get_view_matrix()
+		view_matrix[2][3] = -30
 
 		self._shader_program.setUniformValue('model_matrix',
 		                                     QMatrix4x4(self._model_matrix.flatten().tolist()))
-
 		self._shader_program.setUniformValue('view_matrix',
-		                                     QMatrix4x4(self._camera.get_view_matrix().flatten().tolist()))
-
+		                                     QMatrix4x4(view_matrix.flatten().tolist()).transposed())
 		self._shader_program.setUniformValue('projection_matrix',
-		                                     QMatrix4x4(self._projection_matrix.flatten().tolist()))
+		                                     QMatrix4x4(self._projection_matrix.flatten().tolist()).transposed())
 
-		GL.glClearColor(0.2, 0.2, 0.2, 1)
-		GL.glEnable(GL.GL_DEPTH_TEST)
-		GL.glClear(GL.GL_COLOR_BUFFER_BIT)
-		GL.glDrawArrays(GL.GL_TRIANGLES, 0, 3)
+		GL.glDrawElements(GL.GL_TRIANGLES, len(indices_block), GL.GL_UNSIGNED_INT, indices_block.tolist())
+		# GL.glDrawArrays(GL.GL_TRIANGLES, 0, len(indices_block))
 
 		self._shader_program.disableAttributeArray(0)
 		self._shader_program.disableAttributeArray(1)
@@ -189,18 +220,45 @@ class ModelUnderlayRenderer(QObject):
 		self._window.resetOpenGLState()
 		self._window.update()
 
-	def set_viewport_size ( self, size ):
+	def set_viewport_size (self, size):
 		self._viewport_size = size
 
-	def set_window ( self, window ):
+	def set_window (self, window):
 		self._window = window
 
-	def set_projection_matrix ( self ):
+	def set_projection_matrix (self):
 		# Need to be set every time we change the size of the window
 		self._perspective_projection_matrix = perspective_projection(45.0,
-		                                                             self._viewport_size.width() / self._viewport_size.height(),
-		                                                             0.001, 100.0)
+		                                                             self._window.width() / self._window.height(),
+		                                                             0.001, 1000.0)
 
-		self._orthographic_projection_matrix = orthographic_projection(self._viewport_size.width(),
-		                                                               self._viewport_size.height(),
-		                                                               0.001, 100.0)
+	def move_model (self, val):
+		self._model_matrix[2][3] += val
+
+	def move_camera (self):
+		pass
+
+	def add_geometry (self, geo_enum):
+		obj = None
+		if geo_enum == 0:
+			obj = Cube()
+		elif geo_enum == 1:
+			obj = Sphere()
+		elif geo_enum == 2:
+			obj = Axis()
+		else:
+			return
+
+		self._objects.append(obj)
+		self._vertices.append(obj.vertices)
+		self._colors.append(obj.colors)
+		self._indices.append(obj.indices)
+
+		obj.id = len(self._objects) - 1
+
+	def delete_geometry (self, i = 0):
+		if self._objects:
+			self._vertices.pop(i)
+			self._colors.pop(i)
+			self._indices.pop(i)
+			self._objects.pop(i)
